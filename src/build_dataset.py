@@ -41,6 +41,43 @@ df = pd.DataFrame(all_rows)
 print(df.shape)
 print(df["channel_name"].value_counts())
 
+df["view_count"] = pd.to_numeric(df["view_count"])
+df["like_count"] = pd.to_numeric(df["like_count"])
+df["comment_count"] = pd.to_numeric(df["comment_count"])
+
 df.to_csv(DATA_PROCESSED_DIR / "video_data.csv", index=False)
 print("Saved to data/processed/video_data.csv")
 print(df.shape)
+
+import sqlite3
+
+conn = sqlite3.connect(DATA_PROCESSED_DIR / "analytics.db")
+
+df.to_sql("videos", conn, index=False, if_exists="replace")
+
+check = pd.read_sql("SELECT COUNT(*) AS total_rows FROM videos", conn)
+print(check)
+
+top_videos = pd.read_sql("""
+    select 
+        channel_name,
+        title,
+        view_count,
+        RANK() over (partition by channel_name order by view_count desc) as view_rank 
+        from videos
+""", conn)
+
+print(top_videos[top_videos["view_rank"] == 1])
+
+top_warner = pd.read_sql("""
+    select 
+        title,
+        view_count
+    from videos
+    where channel_name = 'Warner Bros.' 
+    order by view_count desc """, conn)
+
+print(top_warner)
+
+
+conn.close()
